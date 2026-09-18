@@ -145,3 +145,87 @@ If profile fails:
 4. What does `populate()` do?
 5. What is derived state?
 6. Why can a UI appear updated while the database remains unchanged?
+
+## Deep Dive
+
+### Dynamic route to database query
+
+```text
+/profile/mrinal
+   -> useParams()
+   -> username = mrinal
+   -> GET /users/profile/mrinal
+   -> req.params.username
+   -> User.findOne({ username })
+```
+
+The backend then excludes the password and populates the relationship summaries.
+
+### Viewed profile vs authenticated actor
+
+These are different identities. A logged-in user Alex can visit `/profile/john`; John is the profile subject while Alex remains the authenticated actor. This distinction becomes critical for follow/unfollow and future profile editing.
+
+### Populate
+
+The model stores relationship IDs. The profile controller uses:
+
+```js
+.populate('followers', 'name username profileImage')
+.populate('followings', 'name username profileImage')
+```
+
+This turns raw references into lightweight user summaries suitable for the UI.
+
+### Own-profile logic
+
+```js
+const isOwnProfile = loggedInUser?.username === username
+```
+
+This derives the visible action: own profile shows edit controls; another profile shows follow/unfollow. UI visibility is not backend authorization.
+
+### Effect dependency
+
+The profile effect depends on `username` because navigation can move from `/profile/alex` to `/profile/john` while React reuses the same component instance. The parameter change must trigger a new request.
+
+### Follow-state detection
+
+The implementation reads `/users/me`, extracts IDs from the current user's `followings`, and compares them with the target profile `_id`. It accepts either populated objects or raw IDs, which makes the client tolerant of different response shapes.
+
+### Edit-profile boundary
+
+The current edit form changes local state only:
+
+```js
+setUserData((prev) => ({
+  ...prev,
+  ...editForm,
+  profileImage: previewImage || prev.profileImage
+}))
+```
+
+There is no persistent profile-update endpoint in the current B implementation. Therefore local UI change is not database persistence.
+
+### Image preview boundary
+
+`URL.createObjectURL(file)` creates a browser-local preview. It does not upload the image. A persistent upload requires `FormData`, a multipart request, Multer/server processing, storage and usually a saved URL.
+
+### Debugging
+
+Trace profile bugs in this order:
+
+```text
+route declaration
+ -> current URL
+ -> useParams()
+ -> Axios URL
+ -> req.params.username
+ -> MongoDB query
+ -> response shape
+ -> setUserData()
+ -> render
+```
+
+### Viva
+
+Be ready to explain why `/profile/john` can be displayed by Alex, what `useParams()` returns, why `username` belongs in the effect dependency list, what `populate()` does, and why changing React state is not the same as persisting a profile update.
