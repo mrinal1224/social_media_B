@@ -137,3 +137,123 @@ Advantages can include easier querying, timestamps, moderation and very large gr
 4. What is idempotency?
 5. What happens if one update fails?
 6. When would a Follow collection be preferable?
+
+## Deep Dive
+
+### Actor vs target
+
+The server derives the actor from authenticated identity:
+
+```js
+const currentUserId = req.user._id
+const targetUserId = req.params.id
+```
+
+This is a security principle: the client chooses the target, but cannot impersonate the actor.
+
+### Relationship graph
+
+For `A follows B` the schema represents both directions:
+
+```text
+A.followings contains B
+B.followers contains A
+```
+
+That makes reads convenient but creates a consistency responsibility because one action updates two documents.
+
+### Validation sequence
+
+The controller checks:
+
+```text
+self follow
+   -> reject
+missing target
+   -> reject
+already following
+   -> reject
+otherwise
+   -> update both users
+```
+
+### Why `$addToSet`
+
+```js
+$addToSet: { followings: targetUserId }
+```
+
+matches the semantics of a relationship set. Repeating the same relationship does not create another identical array element. `$push` would permit duplicates.
+
+### Unfollow
+
+```js
+$pull: { followings: targetUserId }
+$pull: { followers: currentUserId }
+```
+
+`$pull` removes matching values directly.
+
+### Two writes and consistency
+
+A follow action performs two updates:
+
+```text
+A.followings += B
+B.followers  += A
+```
+
+If the first succeeds and the second fails, the graph becomes asymmetric. Larger systems may use MongoDB transactions or model relationships in a dedicated Follow collection.
+
+### Frontend state machine
+
+```text
+NOT FOLLOWING
+   -> follow request
+ACTION LOADING
+   -> success
+FOLLOWING
+   -> unfollow request
+ACTION LOADING
+   -> success
+NOT FOLLOWING
+```
+
+`isFollowing` describes relationship state; `actionLoading` describes request state. They are intentionally separate.
+
+### Refetch strategy
+
+The current Profile page refetches the profile after follow/unfollow. This makes the server authoritative for counts and relationship lists. An optimistic update can be faster but requires rollback on failure.
+
+### Debugging
+
+Trace:
+
+```text
+button handler
+ -> isFollowing
+ -> POST or DELETE URL
+ -> auth middleware
+ -> target lookup
+ -> MongoDB update
+ -> profile refetch
+ -> React state
+```
+
+### Scaling discussion
+
+A dedicated relation model can represent:
+
+```js
+{
+  follower: A,
+  following: B,
+  createdAt: Date
+}
+```
+
+That design can be more flexible for timestamps, moderation, pagination and large relationship graphs. The current embedded arrays are simple and appropriate for learning the core concept.
+
+### Viva
+
+Explain exactly where actor ID comes from, where target ID comes from, why `$addToSet` is used instead of `$push`, and what failure mode is created by two independent writes.
