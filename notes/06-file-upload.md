@@ -90,3 +90,83 @@ MongoDB metadata
 5. Why are file-size limits necessary?
 6. Why is MIME type alone not complete security?
 7. Why must field names match?
+
+## Deep Dive
+
+### Multipart request
+
+File uploads use `multipart/form-data` because a file is binary data. The route expects one file under the exact field name `profileImage`:
+
+```js
+userRoutes.post('/testUpload', upload.single('profileImage'), testUpload)
+```
+
+### Multer responsibilities
+
+Multer parses the multipart request, applies the file filter, applies the 5 MB limit and exposes the parsed file as `req.file`.
+
+```text
+Browser file
+ -> FormData
+ -> multipart HTTP request
+ -> Multer
+ -> req.file
+ -> controller
+```
+
+### Why field names matter
+
+The client and server must use the same field name:
+
+```js
+formData.append('profileImage', file)
+```
+
+and:
+
+```js
+upload.single('profileImage')
+```
+
+If they disagree, `req.file` may be undefined.
+
+### memoryStorage tradeoff
+
+`multer.memoryStorage()` keeps bytes in RAM. That is convenient when the next step sends a buffer to cloud storage, but large concurrent uploads can consume significant memory. The size limit is therefore an important protection.
+
+### MIME validation
+
+The current filter checks `file.mimetype.startsWith('image/')`. That is useful first-line filtering, but production systems may also inspect file signatures and safely decode or transform the image.
+
+### Preview is not persistence
+
+`URL.createObjectURL(file)` creates a local browser preview. It does not store the file on the server.
+
+```text
+preview: file -> browser URL -> img
+upload:  file -> FormData -> server -> storage -> URL
+```
+
+### Current implementation boundary
+
+The current controller simply sends `req.file` back. This proves parsing works; it is not a complete permanent media-storage pipeline.
+
+### Production flow
+
+```text
+browser
+ -> FormData
+ -> Multer
+ -> validation / transform
+ -> Cloudinary or object storage
+ -> URL
+ -> User.profileImage
+```
+
+### Debugging
+
+For `req.file === undefined`, check file selection, FormData, field name, multipart content type, `upload.single()`, filter rejection and the 5 MB limit.
+
+### Viva
+
+Explain why JSON is not the normal upload format, what Multer does, why memory storage needs a file-size limit, and why a local preview URL does not mean the image is persisted.
