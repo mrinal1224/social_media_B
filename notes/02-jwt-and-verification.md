@@ -122,3 +122,95 @@ It is one piece of the authentication architecture.
 3. Why query MongoDB after verification?
 4. What happens when the secret changes?
 5. How would you revoke tokens?
+
+## Deep Dive
+
+### JWT lifecycle
+
+```text
+login/register
+  -> jwt.sign({ userId }, secret, { expiresIn: '10d' })
+  -> HttpOnly cookie
+  -> future request
+  -> jwt.verify(token, secret)
+  -> decoded.userId
+  -> User.findById()
+  -> req.user
+```
+
+The helper in this repo is:
+
+```js
+const genToken = (userId) => {
+  return jwt.sign({ userId }, process.env.jwt_secret, { expiresIn: "10d" })
+}
+```
+
+### What signing means
+
+`jwt.sign()` creates a token whose signature can later be checked with the server secret. The payload here intentionally contains only the user ID. A JWT payload is not a secret vault; it should not contain passwords or other sensitive values merely because it is inside a token.
+
+### What verification means
+
+The actual middleware first reads the browser cookie, then verifies it:
+
+```js
+const token = req.cookies?.token
+const decoded = jwt.verify(token, process.env.jwt_secret)
+```
+
+Only after verification does the server trust `decoded.userId` enough to query MongoDB.
+
+### Why MongoDB lookup comes after verification
+
+A valid token identifies the user, but the database is the source of current application state. The user might have been deleted or changed since the token was issued.
+
+```text
+cookie
+  -> verify signature/expiry
+  -> get userId
+  -> load current User document
+  -> attach req.user
+```
+
+### Failure matrix
+
+```text
+no cookie
+  -> 401 Authentication required
+
+invalid/expired token
+  -> 401 Invalid or expired token
+
+valid token but no DB user
+  -> 401 User not found
+```
+
+### Why `req.user` matters
+
+Without middleware, every protected controller would repeat cookie parsing, token verification and user lookup. The middleware centralizes identity resolution so controllers can simply use `req.user._id`.
+
+### Authentication vs authorization
+
+JWT verification proves authenticated identity. It does not answer every authorization question. For example, a valid token for user A does not automatically mean A may edit user B's profile.
+
+### Debugging a 401
+
+Trace the request in this exact order:
+
+```text
+cookie exists?
+  -> cookie sent?
+  -> req.cookies.token?
+  -> jwt_secret present?
+  -> jwt.verify succeeds?
+  -> decoded.userId?
+  -> User.findById succeeds?
+```
+
+### Interview points
+
+- JWT is encoded/signed, not a normal encrypted data store.
+- The server must verify before trusting the payload.
+- Database lookup turns verified identity into current user state.
+- Changing the signing secret invalidates tokens created with the old secret.
