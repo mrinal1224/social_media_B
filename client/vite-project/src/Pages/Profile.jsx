@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext'
 
 function Profile() {
     const { username } = useParams()
-    const { user: loggedInUser } = useAuth()
+    const { user: loggedInUser, setUser } = useAuth()
     const [userData, setUserData] = useState(null)
     const [loading, setLoading] = useState(true)
     const [isFollowing, setIsFollowing] = useState(false)
@@ -15,6 +15,7 @@ function Profile() {
     const [selectedImage, setSelectedImage] = useState(null)
     const [previewImage, setPreviewImage] = useState('')
     const [error, setError] = useState('')
+    const [saveLoading, setSaveLoading] = useState(false)
 
     const isOwnProfile = loggedInUser?.username === username
 
@@ -112,23 +113,73 @@ function Profile() {
 
     const handleImageChange = (event) => {
         const file = event.target.files[0]
-        console.log(file)
+
         if (!file) return
 
+        if (!file.type.startsWith('image/')) {
+            alert('Please select an image file.')
+            return
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            alert('Image size should be less than 5MB.')
+            return
+        }
+
         setSelectedImage(file)
-        const previewUrl = URL.createObjectURL(file)
-        console.log(previewUrl)
-        setPreviewImage(previewUrl)
+
+        if (previewImage) {
+            URL.revokeObjectURL(previewImage)
+        }
+
+        // UPDATED: Local object URL is only a preview. Persistence happens on Save Changes.
+        setPreviewImage(URL.createObjectURL(file))
     }
 
-    const handleEditSubmit = (event) => {
+    const handleEditSubmit = async (event) => {
         event.preventDefault()
-        setUserData((prev) => ({
-            ...prev,
-            ...editForm,
-            profileImage: previewImage || prev.profileImage
-        }))
-        setIsEditOpen(false)
+
+        if (saveLoading) return
+
+        try {
+            setSaveLoading(true)
+            setError('')
+
+            // UPDATED: FormData sends profile fields and the binary image in one multipart request.
+            const formData = new FormData()
+            formData.append('name', editForm.name)
+            formData.append('username', editForm.username)
+            formData.append('email', editForm.email)
+            formData.append('bio', editForm.bio)
+
+            if (selectedImage) {
+                formData.append('profileImage', selectedImage)
+            }
+
+            await axiosInstance.put('/users/profile', formData)
+
+            // UPDATED: Refetch so the Cloudinary URL returned by the server becomes the UI source of truth.
+            const updatedProfile = await fetchProfile()
+            setUserData(updatedProfile)
+
+            if (isOwnProfile) {
+                // UPDATED: Keep AuthContext in sync with the persisted profile.
+                setUser(updatedProfile)
+            }
+
+            setIsEditOpen(false)
+            setSelectedImage(null)
+
+            if (previewImage) {
+                URL.revokeObjectURL(previewImage)
+                setPreviewImage('')
+            }
+        } catch (requestError) {
+            console.error('Profile update failed:', requestError)
+            setError(requestError.response?.data?.message || 'Failed to update profile.')
+        } finally {
+            setSaveLoading(false)
+        }
     }
 
     if (loading) {
@@ -282,7 +333,7 @@ function Profile() {
                                                 {selectedImage.name}
                                             </p>
                                         )}
-                                        <p className="mt-1 text-xs text-gray-400">Image upload is UI-only for now.</p>
+                                        <p className="mt-1 text-xs text-gray-400">Image up to 5MB.</p>
                                     </div>
                                 </div>
                             </div>
@@ -311,8 +362,8 @@ function Profile() {
                                 <button type="button" onClick={() => setIsEditOpen(false)} className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50">
                                     Cancel
                                 </button>
-                                <button type="submit" className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
-                                    Save Changes
+                                <button type="submit" disabled={saveLoading} className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
+                                    {saveLoading ? 'Saving...' : 'Save Changes'}
                                 </button>
                             </div>
                         </form>
