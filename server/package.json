@@ -18,6 +18,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.9.4",
     "multer": "^2.4.0",
-    "nodemon": "^3.1.14"
+    "nodemon": "^3.1.14",
+    "cloudinary": "^2.7.0"
   }
 }
