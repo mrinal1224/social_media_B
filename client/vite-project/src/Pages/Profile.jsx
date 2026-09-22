@@ -339,6 +339,7 @@ function Profile() {
                             <button
                                 type="button"
                                 onClick={closeEditProfile}
+                                disabled={editLoading}
                                 className="text-gray-400 hover:text-gray-700 text-2xl leading-none"
                                 aria-label="Close edit profile"
                             >
@@ -403,7 +404,7 @@ function Profile() {
                             </div>
 
                             <div className="flex justify-end gap-3 pt-2">
-                                <button type="button" onClick={() => setIsEditOpen(false)} className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                <button type="button" onClick={closeEditProfile} disabled={editLoading} className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
                                     Cancel
                                 </button>
                                 <button type="submit" disabled={editLoading} className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
