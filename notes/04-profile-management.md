@@ -120,7 +120,7 @@ Navigation can reuse the same Profile component instance. Moving from `/profile/
 
 ## Current edit-profile boundary
 
-The edit modal has controlled form state and image preview state, but the current B implementation's `handleEditSubmit` updates local UI state only. It does not yet send a persistence request to a backend update endpoint.
+The edit modal now persists profile changes through `PUT /users/profile`. Text fields and an optional image are sent as `multipart/form-data`; Multer parses the request, the server uploads the image to Cloudinary, stores the returned URL in `User.profileImage`, and the client refetches the profile after saving.
 
 That distinction matters: a convincing UI is not the same as durable data persistence.
 
