@@ -14,8 +14,8 @@ userRoutes.get('/profile/:username', isAuthenticated, getUserProfile)
 userRoutes.post('/:id/follow', isAuthenticated, followUser)
 userRoutes.delete('/:id/unfollow', isAuthenticated, unfollowUser)
 
-// UPDATED: Authenticated multipart endpoint for profile fields + optional profileImage.
-userRoutes.put('/profile', isAuthenticated, upload.single('profileImage'), updateProfile)
+// UPDATED: Profile update follows the same API contract as Social-Media-A-2029.
+userRoutes.post('/updateProfile', isAuthenticated, upload.single('profileImage'), updateProfile)
 
 userRoutes.post('/testUpload' ,  upload.single('profileImage') , testUpload)
 
