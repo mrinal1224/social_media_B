@@ -173,41 +173,7 @@ function Profile() {
         }
 
         try {
-            setEditLoading(true)
-
-            // UPDATED: Match A repo — profile text + optional image are submitted as multipart/form-data.
-            const formData = new FormData()
-            formData.append('name', editForm.name.trim())
-            formData.append('username', editForm.username.trim())
-            formData.append('email', editForm.email.trim())
-            formData.append('bio', editForm.bio.trim())
-
-            if (selectedImage) {
-                formData.append('profileImage', selectedImage)
-            }
-
-            const response = await axiosInstance.post('/users/updateProfile', formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data'
-                }
-            })
-
-            // UPDATED: Backend response contains the persisted Cloudinary URL.
-            const updatedUser = response.data.user
-
-            setUserData(updatedUser)
-            setUser({
-                ...loggedInUser,
-                ...updatedUser
-            })
-
-            const usernameChanged = updatedUser.username !== username
-
-            closeEditProfile()
-
-            if (usernameChanged) {
-                navigate(`/profile/${updatedUser.username}`, { replace: true })
-            }
+           // Finish this function
         } catch (requestError) {
             console.error('Profile update failed:', requestError)
             setEditError(
