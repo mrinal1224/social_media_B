@@ -2,6 +2,7 @@
 import User from "../models/user.model.js"
 import bcrypt from 'bcrypt'
 import genToken from "../utils/generateToken.js"
+import cloudinary from "../utils/cloudinary.js"
 
 const cookieOptions = {
     httpOnly: true
@@ -170,5 +171,79 @@ export const testUpload = (req , res)=>{
         res.send(req.file)
     } catch (error) {
         return res.status(500).json({ message: 'Internal Server Error' }) 
+    }
+}
+
+
+// UPDATED: Persist profile fields and optionally upload a new profile image.
+export const updateProfile = async (req, res) => {
+    try {
+        const { name, username, email, bio } = req.body
+
+        if (username) {
+            const usernameExists = await User.findOne({
+                username,
+                _id: { $ne: req.user._id }
+            })
+
+            if (usernameExists) {
+                return res.status(409).json({ message: 'Username Already Exists' })
+            }
+        }
+
+        if (email) {
+            const emailExists = await User.findOne({
+                email,
+                _id: { $ne: req.user._id }
+            })
+
+            if (emailExists) {
+                return res.status(409).json({ message: 'Email Already Exists' })
+            }
+        }
+
+        const updateData = {}
+
+        if (name !== undefined) updateData.name = name
+        if (username !== undefined) updateData.username = username
+        if (email !== undefined) updateData.email = email
+        if (bio !== undefined) updateData.bio = bio
+
+        if (req.file) {
+            // UPDATED: Multer gives us a Buffer; Cloudinary gives us the permanent image URL.
+            const uploadResult = await new Promise((resolve, reject) => {
+                const stream = cloudinary.uploader.upload_stream(
+                    {
+                        folder: 'social-media/profile-images',
+                        resource_type: 'image'
+                    },
+                    (error, result) => {
+                        if (error) reject(error)
+                        else resolve(result)
+                    }
+                )
+
+                stream.end(req.file.buffer)
+            })
+
+            updateData.profileImage = uploadResult.secure_url
+        }
+
+        const updatedUser = await User.findByIdAndUpdate(
+            req.user._id,
+            { $set: updateData },
+            { new: true, runValidators: true }
+        )
+
+        return res.status(200).json({
+            message: 'Profile updated successfully',
+            userData: sanitizeUser(updatedUser)
+        })
+    } catch (error) {
+        console.log(error)
+        return res.status(500).json({
+            message: 'Failed to update profile',
+            error: error.message
+        })
     }
 }
