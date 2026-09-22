@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import React, { useEffect, useRef, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { axiosInstance } from '../axiosCalls/axios'
 import { useAuth } from '../context/AuthContext'
 
 function Profile() {
     const { username } = useParams()
+    const navigate = useNavigate()
     const { user: loggedInUser, setUser } = useAuth()
     const [userData, setUserData] = useState(null)
     const [loading, setLoading] = useState(true)
@@ -15,7 +16,9 @@ function Profile() {
     const [selectedImage, setSelectedImage] = useState(null)
     const [previewImage, setPreviewImage] = useState('')
     const [error, setError] = useState('')
-    const [saveLoading, setSaveLoading] = useState(false)
+    const [editError, setEditError] = useState('')
+    const [editLoading, setEditLoading] = useState(false)
+    const fileInputRef = useRef(null)
 
     const isOwnProfile = loggedInUser?.username === username
 
@@ -103,6 +106,7 @@ function Profile() {
         })
         setSelectedImage(null)
         setPreviewImage('')
+        setEditError('')
         setIsEditOpen(true)
     }
 
@@ -111,74 +115,107 @@ function Profile() {
         setEditForm((prev) => ({ ...prev, [name]: value }))
     }
 
-    const handleImageChange = (event) => {
-        const file = event.target.files[0]
+    useEffect(() => {
+        return () => {
+            if (previewImage) {
+                URL.revokeObjectURL(previewImage)
+            }
+        }
+    }, [previewImage])
 
+    const closeEditProfile = () => {
+        if (editLoading) return
+
+        setIsEditOpen(false)
+        setSelectedImage(null)
+        setEditError('')
+        setPreviewImage('')
+
+        if (fileInputRef.current) {
+            fileInputRef.current.value = ''
+        }
+    }
+
+    const handleImageChange = (event) => {
+        const file = event.target.files?.[0]
         if (!file) return
 
         if (!file.type.startsWith('image/')) {
-            alert('Please select an image file.')
+            setEditError('Please select a valid image file.')
+            event.target.value = ''
             return
         }
 
         if (file.size > 5 * 1024 * 1024) {
-            alert('Image size should be less than 5MB.')
+            setEditError('Profile image must be 5MB or smaller.')
+            event.target.value = ''
             return
         }
 
+        setEditError('')
         setSelectedImage(file)
 
         if (previewImage) {
             URL.revokeObjectURL(previewImage)
         }
 
-        // UPDATED: Local object URL is only a preview. Persistence happens on Save Changes.
+        // UPDATED: Local object URL is only a preview. Persistence happens through Cloudinary on Save.
         setPreviewImage(URL.createObjectURL(file))
     }
 
     const handleEditSubmit = async (event) => {
         event.preventDefault()
+        setEditError('')
 
-        if (saveLoading) return
+        if (!editForm.name.trim() || !editForm.username.trim() || !editForm.email.trim()) {
+            setEditError('Name, username and email are required.')
+            return
+        }
 
         try {
-            setSaveLoading(true)
-            setError('')
+            setEditLoading(true)
 
-            // UPDATED: FormData sends profile fields and the binary image in one multipart request.
+            // UPDATED: Match A repo — profile text + optional image are submitted as multipart/form-data.
             const formData = new FormData()
-            formData.append('name', editForm.name)
-            formData.append('username', editForm.username)
-            formData.append('email', editForm.email)
-            formData.append('bio', editForm.bio)
+            formData.append('name', editForm.name.trim())
+            formData.append('username', editForm.username.trim())
+            formData.append('email', editForm.email.trim())
+            formData.append('bio', editForm.bio.trim())
 
             if (selectedImage) {
                 formData.append('profileImage', selectedImage)
             }
 
-            await axiosInstance.put('/users/profile', formData)
+            const response = await axiosInstance.post('/users/updateProfile', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            })
 
-            // UPDATED: Refetch so the Cloudinary URL returned by the server becomes the UI source of truth.
-            const updatedProfile = await fetchProfile()
-            setUserData(updatedProfile)
+            // UPDATED: Backend response contains the persisted Cloudinary URL.
+            const updatedUser = response.data.user
 
-            if (isOwnProfile) {
-                // UPDATED: Keep AuthContext in sync with the persisted profile.
-                setUser(updatedProfile)
-            }
+            setUserData(updatedUser)
+            setUser({
+                ...loggedInUser,
+                ...updatedUser
+            })
 
-            setIsEditOpen(false)
-            setSelectedImage(null)
+            const usernameChanged = updatedUser.username !== username
 
-            if (previewImage) {
-                URL.revokeObjectURL(previewImage)
-                setPreviewImage('')
+            closeEditProfile()
+
+            if (usernameChanged) {
+                navigate(`/profile/${updatedUser.username}`, { replace: true })
             }
         } catch (requestError) {
             console.error('Profile update failed:', requestError)
-            setError(requestError.response?.data?.message || 'Failed to update profile.')
+            setEditError(
+                requestError.response?.data?.message ||
+                'Unable to update profile. Please try again.'
+            )
         } finally {
-            setSaveLoading(false)
+            setEditLoading(false)
         }
     }
 
@@ -301,13 +338,19 @@ function Profile() {
                             </div>
                             <button
                                 type="button"
-                                onClick={() => setIsEditOpen(false)}
+                                onClick={closeEditProfile}
                                 className="text-gray-400 hover:text-gray-700 text-2xl leading-none"
                                 aria-label="Close edit profile"
                             >
                                 &times;
                             </button>
                         </div>
+
+                        {editError && (
+                            <div className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+                                {editError}
+                            </div>
+                        )}
 
                         <form onSubmit={handleEditSubmit} className="space-y-4">
                             <div>
@@ -322,6 +365,7 @@ function Profile() {
                                         <label className="inline-flex cursor-pointer items-center rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200">
                                             Choose Image
                                             <input
+                                                ref={fileInputRef}
                                                 type="file"
                                                 accept="image/*"
                                                 onChange={handleImageChange}
@@ -333,7 +377,7 @@ function Profile() {
                                                 {selectedImage.name}
                                             </p>
                                         )}
-                                        <p className="mt-1 text-xs text-gray-400">Image up to 5MB.</p>
+                                        <p className="mt-1 text-xs text-gray-400">PNG, JPG or other image up to 5MB.</p>
                                     </div>
                                 </div>
                             </div>
@@ -362,8 +406,8 @@ function Profile() {
                                 <button type="button" onClick={() => setIsEditOpen(false)} className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50">
                                     Cancel
                                 </button>
-                                <button type="submit" disabled={saveLoading} className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
-                                    {saveLoading ? 'Saving...' : 'Save Changes'}
+                                <button type="submit" disabled={editLoading} className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
+                                    {editLoading ? 'Saving...' : 'Save Changes'}
                                 </button>
                             </div>
                         </form>
