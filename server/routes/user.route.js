@@ -1,5 +1,5 @@
 import express from 'express'
-import { followUser, getMe, getUserProfile, loginUser, registerUser, testUpload, unfollowUser, updateProfile } from '../controllers/user.controllers.js'
+import { followUser, getMe, getUserProfile, loginUser, registerUser, unfollowUser, updateProfile } from '../controllers/user.controllers.js'
 import { isAuthenticated } from '../middlewares/authMiddleware.js'
 import upload from '../middlewares/upload.middlerware.js'
 
@@ -17,6 +17,6 @@ userRoutes.delete('/:id/unfollow', isAuthenticated, unfollowUser)
 // UPDATED: Profile update follows the same API contract as Social-Media-A-2029.
 userRoutes.post('/updateProfile', isAuthenticated, upload.single('profileImage'), updateProfile)
 
-userRoutes.post('/testUpload' ,  upload.single('profileImage') , testUpload)
+
 
 export default userRoutes

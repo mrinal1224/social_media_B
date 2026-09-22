@@ -2,6 +2,7 @@
 import User from "../models/user.model.js"
 import bcrypt from 'bcrypt'
 import genToken from "../utils/generateToken.js"
+import cloudinary from "../utils/cloudinary.js"
 import uploadToCloudinary from "../utils/uploadToCloudinary.js"
 
 const cookieOptions = {
@@ -166,61 +167,72 @@ export const unfollowUser = async (req, res) => {
     }
 }
 
-export const testUpload = (req , res)=>{
-    try {
-        res.send(req.file)
-    } catch (error) {
-        return res.status(500).json({ message: 'Internal Server Error' }) 
-    }
-}
+// export const testUpload = async (req, res) => {
+//     try {
+//         const uploadedImage = await uploadToCloudinary(req.file.buffer)
+//         res.send(uploadedImage.secure_url)
+//     } catch (error) {
+//         return res.status(500).json({ message: 'Internal Server Error' })
+//     }
+// }
 
 
-// UPDATED: Profile update follows the same flow as Social-Media-A-2029.
-export const updateProfile = async (req, res, next) => {
+// UPDATED: Persist profile fields and optionally upload a new profile image.
+export const updateProfile = async (req, res) => {
     try {
-        const userId = req.user._id
         const { name, username, email, bio } = req.body
 
-        if (!name?.trim() || !username?.trim() || !email?.trim()) {
-            return res.status(400).json({
-                message: 'Name, username and email are required'
+        if (username) {
+            const usernameExists = await User.findOne({
+                username,
+                _id: { $ne: req.user._id }
             })
+
+            if (usernameExists) {
+                return res.status(409).json({ message: 'Username Already Exists' })
+            }
         }
 
-        const cleanUsername = username.trim()
-        const normalizedEmail = email.trim().toLowerCase()
+        if (email) {
+            const emailExists = await User.findOne({
+                email,
+                _id: { $ne: req.user._id }
+            })
 
-        if (await User.findOne({ username: cleanUsername, _id: { $ne: userId } })) {
-            return res.status(409).json({ message: 'Username already exists' })
+            if (emailExists) {
+                return res.status(409).json({ message: 'Email Already Exists' })
+            }
         }
 
-        if (await User.findOne({ email: normalizedEmail, _id: { $ne: userId } })) {
-            return res.status(409).json({ message: 'Email already exists' })
-        }
+        const updateData = {}
 
-        const updates = {
-            name: name.trim(),
-            username: cleanUsername,
-            email: normalizedEmail,
-            bio: bio?.trim() || ''
-        }
+        if (name !== undefined) updateData.name = name
+        if (username !== undefined) updateData.username = username
+        if (email !== undefined) updateData.email = email
+        if (bio !== undefined) updateData.bio = bio
 
         if (req.file) {
-            // UPDATED: Keep Cloudinary upload logic in a separate utility.
-            const uploadedImage = await uploadToCloudinary(req.file.buffer)
-            updates.profileImage = uploadedImage.secure_url
+            // UPDATED: Multer gives us a Buffer; Cloudinary gives us the permanent image URL.
+          const uploadedImage = await uploadToCloudinary(req.file.buffer)
+
+            updateData.profileImage = uploadedImage.secure_url
         }
 
-        const updatedUser = await User.findByIdAndUpdate(userId, updates, {
-            new: true,
-            runValidators: true
-        }).select('-password')
+        const updatedUser = await User.findByIdAndUpdate(
+            req.user._id,
+            { $set: updateData },
+            { new: true, runValidators: true }
+        )
 
         return res.status(200).json({
             message: 'Profile updated successfully',
-            user: updatedUser
+            userData: sanitizeUser(updatedUser)
         })
     } catch (error) {
-        next(error)
+        console.log(error)
+        return res.status(500).json({
+            message: 'Failed to update profile',
+            error: error.message
+        })
     }
 }
