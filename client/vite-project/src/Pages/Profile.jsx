@@ -173,26 +173,41 @@ function Profile() {
         }
 
         try {
-           // Finish this function
-          const formData =  new FormData()
+            // Finish this function
+            const formData = new FormData()
 
-          formData.append('name' ,editForm.name )
-          formData.append('username' ,editForm.username )
-          formData.append('email' ,editForm.email )
-          formData.append('bio' ,editForm.bio )
+            formData.append('name', editForm.name)
+            formData.append('username', editForm.username)
+            formData.append('email', editForm.email)
+            formData.append('bio', editForm.bio)
 
-          if(selectedImage){
-            formData.append('profileImage' , selectedImage)
-          }
+            if (selectedImage) {
+                formData.append('profileImage', selectedImage)
+            }
 
-           await axiosInstance.post('/users/updateProfile' , formData , {
-              headers : {
-                "Content-Type" : "multipart/form-data"
-              }
-           })
+            const response = await axiosInstance.post('/users/updateProfile', formData, {
+                headers: {
+                    "Content-Type": "multipart/form-data"
+                }
+            })
+
+            setUserData(response.data.userData)
+
+            console.log(userData)
+
+            // Solve the Navigation Bug
+
+            const userNameChanged = userData.username !== username
+
+            if (userNameChanged) {
+                navigate(`/profile/${userData.username}`)
+            }
 
 
-           
+
+
+
+
 
         } catch (requestError) {
             console.error('Profile update failed:', requestError)
