@@ -1,6 +1,7 @@
 import uploadToCloudinary from "../utils/uploadToCloudinary.js";
 
 import Post from "../models/post.model.js";
+import User from "../models/user.model.js";
 
 
 export const createPost = async (req, res) => {
@@ -32,6 +33,19 @@ export const createPost = async (req, res) => {
             user: req.user._id
 
         })
+
+        await User.findByIdAndUpdate(req.user._id , {
+            $push : {posts :newPost._id }
+        })
+
+
+        
+
+
+
+
+
+
 
         res.status(201).json({ message: "Post Created ", post: newPost })
 
