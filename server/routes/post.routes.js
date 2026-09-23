@@ -1,6 +1,8 @@
 import express from 'express'
-import { isAuthenticated } from '../middlewares/authMiddleware'
-import { createPost } from '../controllers/post.controllers'
+import { isAuthenticated } from '../middlewares/authMiddleware.js'
+import { createPost } from '../controllers/post.controllers.js'
+import upload from '../middlewares/upload.middlerware.js'
+
 
 
 
