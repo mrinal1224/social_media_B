@@ -30,7 +30,7 @@ export const createPost = async (req, res) => {
         const newPost = await Post.create({
             image,
             caption,
-            user: req.user._id
+            author: req.user._id
 
         })
 
@@ -39,7 +39,7 @@ export const createPost = async (req, res) => {
         })
 
 
-        
+     const populatedPostData = await Post.findById(newPost._id).populate('author' , 'name username profileImage')
 
 
 
@@ -47,7 +47,7 @@ export const createPost = async (req, res) => {
 
 
 
-        res.status(201).json({ message: "Post Created ", post: newPost })
+        res.status(201).json({ message: "Post Created ", post: populatedPostData })
 
 } catch (error) {
         return res.status(500).json({ message: 'Internal Server Error', error: error })

@@ -1,8 +1,8 @@
 import mongoose from "mongoose";
 
 const postSchema = new mongoose.Schema({
-    user: {
-        type: mongoose.Schema.Types.ObjectId,
+    author: {
+        type: mongoose.Schema.Types.ObjectId,//1234
         ref: "User",
         required: true
     },
