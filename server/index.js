@@ -5,6 +5,7 @@ import userRoutes from './routes/user.route.js'
 import cookieParser from 'cookie-parser'
 import cors from 'cors'
 import postRoutes from './routes/post.routes.js'
+import reelRoutes from './routes/reel.routes.js'
 
 const app = express()
 const Port = 8085
@@ -33,6 +34,7 @@ app.use(cookieParser())
 
 app.use('/users' , userRoutes)
 app.use('/post' , postRoutes)
+app.use('/reel' , reelRoutes)
 
 
 
