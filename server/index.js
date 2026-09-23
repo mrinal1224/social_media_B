@@ -4,6 +4,7 @@ import dotenv from 'dotenv'
 import userRoutes from './routes/user.route.js'
 import cookieParser from 'cookie-parser'
 import cors from 'cors'
+import postRoutes from './routes/post.routes.js'
 
 const app = express()
 const Port = 8085
@@ -31,6 +32,7 @@ app.use(cookieParser())
 
 
 app.use('/users' , userRoutes)
+app.use('/post' , postRoutes)
 
 
 
