@@ -103,6 +103,7 @@ function Home() {
       });
 
       const newItem = response.data.post || response.data.reel;
+      console.log(newItem)
       const createdType = contentType;
 
       // Prepend newly created item directly to the top of the feed

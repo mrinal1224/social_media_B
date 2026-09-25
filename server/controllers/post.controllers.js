@@ -70,3 +70,35 @@ export const getAllPosts = async (req, res) => {
         return res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
 };
+
+
+// Handle Likes and Unlikes
+
+export const toggleLike = async (req, res) => {
+    try {
+        const userId = req.user._id
+        const postId = req.params.id
+
+        const post = await Post.findById(postId)
+
+        const isAlreadyLiked = post.likes.some((id) => (id) === userId)
+
+        const flag  = flase
+
+        if (isAlreadyLiked) {
+            post.likes.pull(userId)
+            flag = false
+           
+        } else {
+            post.likes.push(userId)
+            flag = true
+        }
+
+
+        res.status(200).json({ message: "Operation Done", likes: likes.length })
+
+
+} catch (error) {
+
+    }
+}
