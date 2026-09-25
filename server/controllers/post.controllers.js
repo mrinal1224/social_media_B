@@ -76,29 +76,32 @@ export const getAllPosts = async (req, res) => {
 
 export const toggleLike = async (req, res) => {
     try {
-        const userId = req.user._id
-        const postId = req.params.id
+        const userId = req.user._id;
+        const postId = req.params.id;
 
-        const post = await Post.findById(postId)
-
-        const isAlreadyLiked = post.likes.some((id) => (id) === userId)
-
-        const flag  = flase
-
-        if (isAlreadyLiked) {
-            post.likes.pull(userId)
-            flag = false
-           
-        } else {
-            post.likes.push(userId)
-            flag = true
+        const post = await Post.findById(postId);
+        if (!post) {
+            return res.status(404).json({ message: "Post not found" });
         }
 
+        const isAlreadyLiked = post.likes.some((id) => id.toString() === userId.toString());
 
-        res.status(200).json({ message: "Operation Done", likes: likes.length })
+        if (isAlreadyLiked) {
+            post.likes.pull(userId);
+        } else {
+            post.likes.push(userId);
+        }
 
+        await post.save();
 
-} catch (error) {
+        return res.status(200).json({
+            message: isAlreadyLiked ? "Unliked" : "Liked",
+            isLiked: !isAlreadyLiked,
+            likesCount: post.likes.length,
+            likes: post.likes
+        });
 
+    } catch (error) {
+        return res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
-}
+};
