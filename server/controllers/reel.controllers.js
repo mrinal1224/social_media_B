@@ -54,4 +54,20 @@ export const createReel = async (req, res) => {
     }
 }
 
+export const getAllReels = async (req, res) => {
+    try {
+        const reels = await Reel.find()
+            .populate('author', 'name username profileImage')
+            .sort({ createdAt: -1 });
+
+        if (!reels || reels.length === 0) {
+            return res.status(200).json({ message: 'No Reels to Show', reels: [] });
+        }
+
+        return res.status(200).json({ message: "All Reels Fetched", reels });
+    } catch (error) {
+        return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+    }
+};
+
 

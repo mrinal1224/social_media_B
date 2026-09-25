@@ -34,12 +34,12 @@ export const createPost = async (req, res) => {
 
         })
 
-        await User.findByIdAndUpdate(req.user._id , {
-            $push : {posts :newPost._id }
+        await User.findByIdAndUpdate(req.user._id, {
+            $push: { posts: newPost._id }
         })
 
 
-     const populatedPostData = await Post.findById(newPost._id).populate('author' , 'name username profileImage')
+        const populatedPostData = await Post.findById(newPost._id).populate('author', 'name username profileImage')
 
 
 
@@ -49,7 +49,24 @@ export const createPost = async (req, res) => {
 
         res.status(201).json({ message: "Post Created ", post: populatedPostData })
 
-} catch (error) {
+    } catch (error) {
         return res.status(500).json({ message: 'Internal Server Error', error: error })
     }
 }
+
+
+export const getAllPosts = async (req, res) => {
+    try {
+        const posts = await Post.find()
+            .populate('author', 'name username profileImage')
+            .sort({ createdAt: -1 });
+
+        if (!posts || posts.length === 0) {
+            return res.status(200).json({ message: 'No Posts to Show', posts: [] });
+        }
+
+        return res.status(200).json({ message: "All Posts Fetched", posts });
+    } catch (error) {
+        return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+    }
+};
