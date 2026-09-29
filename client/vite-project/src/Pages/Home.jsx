@@ -8,6 +8,47 @@ const getStories = async () => {
   return response.data.stories || [];
 };
 
+const STORY_DISPLAY_TIME = 30_000;
+
+const groupStoriesByAuthor = (stories, currentUserId) => {
+  const groups = new Map();
+
+  stories.forEach((story) => {
+    const authorId = story.author?._id?.toString();
+    const groupKey = authorId || story.author?.username || story._id;
+
+    if (!groups.has(groupKey)) {
+      groups.set(groupKey, {
+        authorId,
+        author: story.author,
+        stories: [],
+      });
+    }
+
+    groups.get(groupKey).stories.push(story);
+  });
+
+  const orderedGroups = [...groups.values()].map((group) => ({
+    ...group,
+    stories: group.stories.sort(
+      (first, second) => new Date(first.createdAt) - new Date(second.createdAt)
+    ),
+  }));
+
+  return orderedGroups.sort((first, second) => {
+    const firstIsCurrentUser = first.authorId === currentUserId?.toString();
+    const secondIsCurrentUser = second.authorId === currentUserId?.toString();
+
+    if (firstIsCurrentUser !== secondIsCurrentUser) {
+      return firstIsCurrentUser ? -1 : 1;
+    }
+
+    const firstLatestStory = first.stories[first.stories.length - 1];
+    const secondLatestStory = second.stories[second.stories.length - 1];
+    return new Date(secondLatestStory.createdAt) - new Date(firstLatestStory.createdAt);
+  });
+};
+
 
 function Avatar({ initials, tone = "from-slate-700 to-slate-900", size = "h-11 w-11" }) {
   return (
@@ -33,7 +74,18 @@ function Home() {
   const [storyFile, setStoryFile] = useState(null);
   const [storyPreview, setStoryPreview] = useState("");
   const [creatingStory, setCreatingStory] = useState(false);
-  const [activeStory, setActiveStory] = useState(null);
+  const [activeStoryGroup, setActiveStoryGroup] = useState(null);
+  const [activeStoryIndex, setActiveStoryIndex] = useState(0);
+
+  const storyGroups = groupStoriesByAuthor(stories, user?._id);
+  const personalStoryGroup = storyGroups[0]?.authorId === user?._id?.toString()
+    ? storyGroups[0]
+    : null;
+  const otherStoryGroups = personalStoryGroup ? storyGroups.slice(1) : storyGroups;
+  const latestPersonalStory = personalStoryGroup
+    ? personalStoryGroup.stories[personalStoryGroup.stories.length - 1]
+    : null;
+  const activeStory = activeStoryGroup?.stories[activeStoryIndex] || null;
 
   const getInitials = (name) =>
     name?.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "U";
@@ -105,6 +157,43 @@ function Home() {
       if (storyPreview) URL.revokeObjectURL(storyPreview);
     };
   }, [storyPreview]);
+
+  useEffect(() => {
+    if (!activeStoryGroup) return undefined;
+
+    const timer = window.setTimeout(() => {
+      if (activeStoryIndex < activeStoryGroup.stories.length - 1) {
+        setActiveStoryIndex((currentIndex) => currentIndex + 1);
+      } else {
+        setActiveStoryGroup(null);
+        setActiveStoryIndex(0);
+      }
+    }, STORY_DISPLAY_TIME);
+
+    return () => window.clearTimeout(timer);
+  }, [activeStoryGroup, activeStoryIndex]);
+
+  const openStoryGroup = (storyGroup) => {
+    setActiveStoryGroup(storyGroup);
+    setActiveStoryIndex(0);
+  };
+
+  const closeStoryViewer = () => {
+    setActiveStoryGroup(null);
+    setActiveStoryIndex(0);
+  };
+
+  const showPreviousStory = () => {
+    setActiveStoryIndex((currentIndex) => Math.max(0, currentIndex - 1));
+  };
+
+  const showNextStory = () => {
+    if (activeStoryIndex < activeStoryGroup.stories.length - 1) {
+      setActiveStoryIndex((currentIndex) => currentIndex + 1);
+    } else {
+      closeStoryViewer();
+    }
+  };
 
   const handleStoryFileChange = (event) => {
     const file = event.target.files?.[0];
@@ -306,45 +395,63 @@ function Home() {
               </div>
             </div>
             <div className="flex gap-4 overflow-x-auto border-t border-slate-100 px-5 py-4 scrollbar-hide">
-              <button
-                type="button"
-                onClick={() => setStoryFormOpen(true)}
-                className="group flex w-[76px] shrink-0 flex-col items-center gap-2"
-              >
-                <div className="relative rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 p-[3px] transition group-hover:scale-105">
-                  <div className="rounded-full bg-white p-[2px]">
-                    <Avatar initials={getInitials(user?.name)} tone="from-indigo-500 to-violet-500" size="h-12 w-12" />
+              <div className="group flex w-[76px] shrink-0 flex-col items-center gap-2">
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => personalStoryGroup ? openStoryGroup(personalStoryGroup) : setStoryFormOpen(true)}
+                    className="rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 p-[3px] transition group-hover:scale-105"
+                    aria-label={personalStoryGroup ? "View your stories" : "Create your story"}
+                  >
+                    <div className="rounded-full bg-white p-[2px]">
+                      {latestPersonalStory?.image ? (
+                        <img src={latestPersonalStory.image} alt="" className="h-12 w-12 rounded-full object-cover" />
+                      ) : (
+                        <Avatar initials={getInitials(user?.name)} tone="from-indigo-500 to-violet-500" size="h-12 w-12" />
+                      )}
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStoryFormOpen(true)}
+                    className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-indigo-600 text-sm font-bold text-white"
+                    aria-label="Add another story"
+                  >
+                    +
+                  </button>
                   </div>
-                  <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-indigo-600 text-sm font-bold text-white">+</span>
-                </div>
                 <span className="w-full truncate text-center text-[11px] font-semibold text-slate-600">Your Story</span>
-              </button>
+              </div>
 
               {fetchingStories ? (
                 <div className="flex items-center px-3 text-xs text-slate-400">Loading stories...</div>
-              ) : stories.map((story) => (
+              ) : otherStoryGroups.map((storyGroup) => {
+                const latestStory = storyGroup.stories[storyGroup.stories.length - 1];
+
+                return (
                 <button
                   type="button"
-                  key={story._id}
-                  onClick={() => setActiveStory(story)}
+                  key={storyGroup.authorId || latestStory._id}
+                  onClick={() => openStoryGroup(storyGroup)}
                   className="group flex w-[76px] shrink-0 flex-col items-center gap-2"
                 >
                   <div className="rounded-full bg-gradient-to-br from-pink-500 via-violet-500 to-indigo-500 p-[3px] transition group-hover:scale-105">
                     <div className="rounded-full bg-white p-[2px]">
-                      {story.image ? (
-                        <img src={story.image} alt="" className="h-12 w-12 rounded-full object-cover" />
-                      ) : story.author?.profileImage ? (
-                        <img src={story.author.profileImage} alt="" className="h-12 w-12 rounded-full object-cover" />
+                      {latestStory.image ? (
+                        <img src={latestStory.image} alt="" className="h-12 w-12 rounded-full object-cover" />
+                      ) : storyGroup.author?.profileImage ? (
+                        <img src={storyGroup.author.profileImage} alt="" className="h-12 w-12 rounded-full object-cover" />
                       ) : (
-                        <Avatar initials={getInitials(story.author?.username)} tone="from-pink-500 to-violet-500" size="h-12 w-12" />
+                        <Avatar initials={getInitials(storyGroup.author?.username)} tone="from-pink-500 to-violet-500" size="h-12 w-12" />
                       )}
                     </div>
                   </div>
                   <span className="w-full truncate text-center text-[11px] font-semibold text-slate-600">
-                    {story.author?._id === user?._id ? "You" : story.author?.username || "Story"}
+                    {storyGroup.authorId === user?._id?.toString() ? "You" : storyGroup.author?.username || "Story"}
                   </span>
                 </button>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -533,20 +640,57 @@ function Home() {
       )}
 
       {activeStory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-4" onMouseDown={() => setActiveStory(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-4" onMouseDown={closeStoryViewer}>
           <div className="relative w-full max-w-md overflow-hidden rounded-3xl bg-slate-900 shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between bg-gradient-to-b from-black/70 to-transparent p-4 text-white">
+            <div className="absolute inset-x-0 top-0 z-20 flex gap-1.5 px-3 pt-3">
+              {activeStoryGroup.stories.map((story, index) => (
+                <div key={story._id} className="h-1 flex-1 overflow-hidden rounded-full bg-white/35">
+                  <div
+                    key={`${story._id}-${activeStoryIndex}`}
+                    className={`h-full rounded-full bg-white ${
+                      index < activeStoryIndex
+                        ? "w-full"
+                        : index === activeStoryIndex
+                          ? "story-progress-current"
+                          : "w-0"
+                    }`}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between bg-gradient-to-b from-black/70 to-transparent px-4 pb-8 pt-7 text-white">
               <div className="flex items-center gap-3">
                 {activeStory.author?.profileImage ? (
                   <img src={activeStory.author.profileImage} alt="" className="h-9 w-9 rounded-full object-cover ring-2 ring-white/70" />
                 ) : (
                   <Avatar initials={getInitials(activeStory.author?.username)} size="h-9 w-9" />
                 )}
-                <span className="text-sm font-bold">@{activeStory.author?.username || "user"}</span>
+                <div>
+                  <p className="text-sm font-bold">@{activeStory.author?.username || "user"}</p>
+                  <p className="text-[10px] text-white/70">{activeStoryIndex + 1} of {activeStoryGroup.stories.length} · 30 seconds</p>
+                </div>
               </div>
-              <button type="button" onClick={() => setActiveStory(null)} className="rounded-full bg-black/20 px-3 py-2" aria-label="Close story">✕</button>
+              <button type="button" onClick={closeStoryViewer} className="rounded-full bg-black/20 px-3 py-2" aria-label="Close story">✕</button>
             </div>
             {activeStory.image && <img src={activeStory.image} alt={activeStory.caption || "Story"} className="max-h-[80vh] min-h-[480px] w-full object-cover" />}
+            <button
+              type="button"
+              onClick={showPreviousStory}
+              disabled={activeStoryIndex === 0}
+              className="absolute bottom-20 left-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/35 text-2xl text-white disabled:hidden"
+              aria-label="Previous story"
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              onClick={showNextStory}
+              className="absolute bottom-20 right-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/35 text-2xl text-white"
+              aria-label={activeStoryIndex === activeStoryGroup.stories.length - 1 ? "Close stories" : "Next story"}
+            >
+              ›
+            </button>
             {activeStory.caption && (
               <p className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-6 pb-6 pt-16 text-center text-sm font-semibold text-white">
                 {activeStory.caption}
