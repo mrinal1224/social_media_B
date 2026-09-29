@@ -1,1 +1,15 @@
 @import "tailwindcss";
+
+@keyframes story-progress {
+  from {
+    width: 0;
+  }
+
+  to {
+    width: 100%;
+  }
+}
+
+.story-progress-current {
+  animation: story-progress 30s linear forwards;
+}
