@@ -8,9 +8,8 @@ import { AuthProvider } from './context/AuthContext'
 import PublicRoute from './components/PublicRoute'
 import ProtectedRoute from './components/ProtectedRoute'
 import Profile from './pages/Profile'
-import socket from './socket.js'
-import { useEffect } from 'react'
 import SocketManager from './components/SocketManager'
+import Notifications from './pages/Notifications'
 
 
 function App() {
@@ -29,6 +28,7 @@ function App() {
             <Route path='/home' element={<ProtectedRoute><Home /></ProtectedRoute>} />
 
             <Route path='/profile/:username' element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path='/notifications' element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
 
 
 
