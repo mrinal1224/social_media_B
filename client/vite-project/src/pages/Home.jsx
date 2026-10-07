@@ -497,6 +497,8 @@ function Home() {
 
           <div className="flex items-center gap-2">
             <button
+              type="button"
+              onClick={() => navigate("/notifications")}
               className="relative rounded-full p-2.5 text-slate-500 transition hover:bg-slate-100"
               aria-label="Notifications"
             >
@@ -531,7 +533,11 @@ function Home() {
                 <span className="text-lg">◉</span>
                 <span className="text-sm font-semibold">My Profile</span>
               </button>
-              <button className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-slate-600 transition hover:bg-slate-50">
+              <button
+                type="button"
+                onClick={() => navigate("/notifications")}
+                className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-slate-600 transition hover:bg-slate-50"
+              >
                 <span className="text-lg">🔔</span>
                 <span className="flex-1 text-sm font-semibold">Notifications</span>
                 {unreadNotificationCount > 0 && (
