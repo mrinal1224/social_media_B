@@ -10,14 +10,15 @@ const SocketManager = () => {
 
     useEffect(() => {
 
-        // If there is no logged-in user,
-        // we don't need an authenticated socket connection.
         if (!user?._id) {
             return;
         }
 
 
-        // Runs once Socket.IO successfully connects
+        // ------------------------------------------
+        // SOCKET CONNECTED
+        // ------------------------------------------
+
         const handleConnect = () => {
 
             console.log(
@@ -26,8 +27,8 @@ const SocketManager = () => {
             );
 
 
-            // Tell server:
-            // "this socket belongs to this user"
+            // Tell server which user owns this socket
+
             socket.emit(
                 "register-user",
                 user._id
@@ -36,7 +37,13 @@ const SocketManager = () => {
         };
 
 
-        const handleConnectError = (error) => {
+        // ------------------------------------------
+        // CONNECTION ERROR
+        // ------------------------------------------
+
+        const handleConnectError = (
+            error
+        ) => {
 
             console.log(
                 "Socket connection error:",
@@ -46,7 +53,13 @@ const SocketManager = () => {
         };
 
 
-        const handleDisconnect = (reason) => {
+        // ------------------------------------------
+        // DISCONNECT
+        // ------------------------------------------
+
+        const handleDisconnect = (
+            reason
+        ) => {
 
             console.log(
                 "Socket disconnected:",
@@ -56,16 +69,37 @@ const SocketManager = () => {
         };
 
 
-        // Register socket listeners
+        // ------------------------------------------
+        // NEW REALTIME NOTIFICATION
+        // ------------------------------------------
+
+        const handleNewNotification = (
+            notification
+        ) => {
+
+            console.log(
+                "NEW REALTIME NOTIFICATION:",
+                notification
+            );
+
+        };
+
+
+        // ------------------------------------------
+        // REGISTER LISTENERS
+        // ------------------------------------------
+
         socket.on(
             "connect",
             handleConnect
         );
 
+
         socket.on(
             "connect_error",
             handleConnectError
         );
+
 
         socket.on(
             "disconnect",
@@ -73,12 +107,22 @@ const SocketManager = () => {
         );
 
 
-        // Start the socket connection
+        socket.on(
+            "new-notification",
+            handleNewNotification
+        );
+
+
+        // ------------------------------------------
+        // CONNECT
+        // ------------------------------------------
+
         socket.connect();
 
 
-        // If socket was somehow already connected,
-        // register this user immediately.
+        // If already connected,
+        // register the user immediately
+
         if (socket.connected) {
 
             socket.emit(
@@ -89,8 +133,10 @@ const SocketManager = () => {
         }
 
 
-        // Cleanup when component unmounts
-        // or logged-in user changes
+        // ------------------------------------------
+        // CLEANUP
+        // ------------------------------------------
+
         return () => {
 
             socket.off(
@@ -98,14 +144,22 @@ const SocketManager = () => {
                 handleConnect
             );
 
+
             socket.off(
                 "connect_error",
                 handleConnectError
             );
 
+
             socket.off(
                 "disconnect",
                 handleDisconnect
+            );
+
+
+            socket.off(
+                "new-notification",
+                handleNewNotification
             );
 
 
@@ -116,7 +170,6 @@ const SocketManager = () => {
     }, [user?._id]);
 
 
-    // This component has no UI.
     return null;
 };
 

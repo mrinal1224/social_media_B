@@ -4,6 +4,10 @@ import generateToken from "../utils/generateToken.js";
 import uploadToCloudinary from "../utils/uploadToCloudinary.js";
 import Notification from "../models/notification.model.js";
 
+import {
+    sendNotification
+} from "../socket/socket.js";
+
 const cookieOptions = {
     httpOnly: true,
     sameSite: "lax",
@@ -126,101 +130,182 @@ export const testFileUpload = async (req, res, next) => {
     }
 };
 
-export const followUser = async (req, res) => {
+export const followUser = async (
+    req,
+    res
+) => {
+
     try {
 
-        // The logged-in user who is performing the follow
-        const currentUserId = req.user._id;
+        const currentUserId =
+            req.user._id;
 
-        // The user whom we want to follow
-        const targetUserId = req.params.id;
+        const targetUserId =
+            req.params.id;
 
 
-        // A user should not be able to follow themselves
-        if (currentUserId.toString() === targetUserId.toString()) {
-            return res.status(409).json({
-                message: "You cannot follow yourself"
-            });
+        // Cannot follow yourself
+
+        if (
+            currentUserId.toString()
+            === targetUserId.toString()
+        ) {
+
+            return res
+                .status(409)
+                .json({
+                    message:
+                        "You cannot follow yourself"
+                });
+
         }
 
 
-        // Check whether the target user actually exists
-        const targetUser = await User.findById(targetUserId);
+        // Target user must exist
+
+        const targetUser =
+            await User.findById(
+                targetUserId
+            );
+
 
         if (!targetUser) {
-            return res.status(404).json({
-                message: "No Target User Found"
-            });
+
+            return res
+                .status(404)
+                .json({
+                    message:
+                        "No Target User Found"
+                });
+
         }
 
 
-        // Check whether the current user already follows the target user
-        const alreadyFollowing = targetUser.followers.some(
-            (id) => id.toString() === currentUserId.toString()
-        );
+        // Check if already following
+
+        const alreadyFollowing =
+            targetUser.followers.some(
+                (id) =>
+                    id.toString()
+                    ===
+                    currentUserId.toString()
+            );
+
 
         if (alreadyFollowing) {
-            return res.status(409).json({
-                message: "You are already following this user"
-            });
+
+            return res
+                .status(409)
+                .json({
+                    message:
+                        "You are already following this user"
+                });
+
         }
 
 
-        // Add target user to current user's following list
+        // Current User
+        // starts following Target User
+
         await User.findByIdAndUpdate(
             currentUserId,
             {
                 $addToSet: {
-                    followings: targetUserId
+                    followings:
+                        targetUserId
                 }
             }
         );
 
 
-        // Add current user to target user's followers list
+        // Target User
+        // gets Current User as follower
+
         await User.findByIdAndUpdate(
             targetUserId,
             {
                 $addToSet: {
-                    followers: currentUserId
+                    followers:
+                        currentUserId
                 }
             }
         );
 
 
-        // ---------------------------------------------
-        // NEW PART: CREATE THE NOTIFICATION
-        // ---------------------------------------------
+        // ------------------------------------------
+        // CREATE NOTIFICATION IN DATABASE
+        // ------------------------------------------
 
-        const notification = await Notification.create({
+        const notification =
+            await Notification.create({
 
-            // Who performed the follow?
-            sender: currentUserId,
+                sender:
+                    currentUserId,
 
-            // Who should receive the notification?
-            receiver: targetUserId,
+                receiver:
+                    targetUserId,
 
-            // What happened?
-            type: "follow"
-        });
+                type:
+                    "follow"
+
+            });
 
 
-        return res.status(200).json({
-            message: "User followed",
+        // ------------------------------------------
+        // POPULATE SENDER INFORMATION
+        // ------------------------------------------
 
-            // Temporarily returning this so we can easily
-            // verify that our notification was created
-            notification
-        });
+        const populatedNotification =
+            await Notification
+                .findById(
+                    notification._id
+                )
+
+                .populate(
+                    "sender",
+                    "name username profileImage"
+                );
+
+
+        // ------------------------------------------
+        // SEND REALTIME NOTIFICATION
+        // ------------------------------------------
+
+        sendNotification(
+            targetUserId,
+            populatedNotification
+        );
+
+
+        return res
+            .status(200)
+            .json({
+
+                message:
+                    "User followed",
+
+                notification:
+                    populatedNotification
+
+            });
+
 
     } catch (error) {
 
         console.log(error);
 
-        return res.status(500).json({
-            message: "Internal Server Error"
-        });
+
+        return res
+            .status(500)
+            .json({
+
+                message:
+                    "Internal Server Error"
+
+            });
+
     }
+
 };
 
 export const unfollowUser = async (req, res) => {
