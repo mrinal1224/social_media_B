@@ -44,6 +44,8 @@ function Home() {
   const stories = useSelector((state) => state.stories.items);
   const storyLoading = useSelector((state) => state.stories.loading);
   const storyStoreError = useSelector((state) => state.stories.error);
+  const notifications = useSelector((state) => state.notifications.items);
+  const unreadNotificationCount = notifications.filter((notification) => !notification.isRead).length;
   const [storyError, setStoryError] = useState("");
   const [storyFile, setStoryFile] = useState(null);
   const [storyCaption, setStoryCaption] = useState("");
@@ -494,7 +496,17 @@ function Home() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button className="rounded-full p-2.5 text-slate-500 transition hover:bg-slate-100" aria-label="Notifications">♡</button>
+            <button
+              className="relative rounded-full p-2.5 text-slate-500 transition hover:bg-slate-100"
+              aria-label="Notifications"
+            >
+              <span className="text-lg">🔔</span>
+              {unreadNotificationCount > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                  {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
+                </span>
+              )}
+            </button>
             <button
               onClick={() => navigate(`/profile/${user?.username}`)}
               className="flex items-center gap-2 rounded-full border border-slate-200 bg-white py-1.5 pl-1.5 pr-3 transition hover:border-slate-300 hover:shadow-sm"
@@ -520,8 +532,13 @@ function Home() {
                 <span className="text-sm font-semibold">My Profile</span>
               </button>
               <button className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-slate-600 transition hover:bg-slate-50">
-                <span className="text-lg">♡</span>
-                <span className="text-sm font-semibold">Notifications</span>
+                <span className="text-lg">🔔</span>
+                <span className="flex-1 text-sm font-semibold">Notifications</span>
+                {unreadNotificationCount > 0 && (
+                  <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                    {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
+                  </span>
+                )}
               </button>
               <button className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-slate-600 transition hover:bg-slate-50">
                 <span className="text-lg">⌁</span>
