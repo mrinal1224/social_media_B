@@ -1,11 +1,14 @@
 import { useEffect } from "react";
+import { useDispatch } from "react-redux";
 import { useAuth } from "../context/AuthContext";
 import socket from "../socket";
+import { addNotification, fetchNotifications } from "../redux/notificationsSlice";
 
 
 const SocketManager = () => {
 
     const { user } = useAuth();
+    const dispatch = useDispatch();
 
 
     useEffect(() => {
@@ -13,6 +16,9 @@ const SocketManager = () => {
         if (!user?._id) {
             return;
         }
+
+        // Hydrate persistent/offline notifications from MongoDB.
+        dispatch(fetchNotifications());
 
 
         // ------------------------------------------
@@ -81,6 +87,9 @@ const SocketManager = () => {
                 "NEW REALTIME NOTIFICATION:",
                 notification
             );
+
+            // Store the realtime notification in Redux so the whole app reacts instantly.
+            dispatch(addNotification(notification));
 
         };
 
@@ -167,7 +176,7 @@ const SocketManager = () => {
 
         };
 
-    }, [user?._id]);
+    }, [user?._id, dispatch]);
 
 
     return null;
